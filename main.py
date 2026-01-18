@@ -36,7 +36,7 @@ def submit_application():
     return requests.post(
         "https://b12.io/apply/submission",
         data=body,
-        headers={'sha256': body_hmac.hexdigest()}
+        headers={'X-Signature-256': f"sha256={body_hmac.hexdigest()}"}
     )
     
 

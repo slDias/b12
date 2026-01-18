@@ -31,7 +31,7 @@ def test_makes_request(dt_mock):
     expected_response = {"success": True, "receipt": uuid.uuid4().hex}
     body_hmac = hmac.new(os.environ.get("SECRET").encode(), expected_request_text.encode("utf-8"), hashlib.sha256)
 
-    expected_headers = {"sha256": body_hmac.hexdigest()}
+    expected_headers = {"X-Signature-256": f"sha256={body_hmac.hexdigest()}"}
     responses.add(
         responses.Response(
             method="POST",
