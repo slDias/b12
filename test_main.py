@@ -9,8 +9,12 @@ from datetime import UTC
 
 from main import submit_application
 
+import hmac
+import hashlib
+
+
 @patch("main.datetime")
-@patch.dict(os.environ, {"GITHUB_RUN_ID": "id_placeholder"}, clear=True)
+@patch.dict(os.environ, {"GITHUB_RUN_ID": uuid.uuid4().hex, "SECRET": uuid.uuid4().hex}, clear=True)
 @responses.activate
 def test_makes_request(dt_mock):
     expected_time = "2026-01-06T16:59:37.571Z"
@@ -25,13 +29,17 @@ def test_makes_request(dt_mock):
     }
     expected_request_text = json.dumps(expected_request, separators=(',', ':'))
     expected_response = {"success": True, "receipt": uuid.uuid4().hex}
+    body_hmac = hmac.new(os.environ.get("SECRET").encode(), expected_request_text.encode("utf-8"), hashlib.sha256)
+
+    expected_headers = {"sha256": body_hmac.hexdigest()}
     responses.add(
         responses.Response(
             method="POST",
             url="https://b12.io/apply/submission",
             json=expected_response,
             match=[
-                matchers.body_matcher(expected_request_text)
+                matchers.body_matcher(expected_request_text),
+                matchers.header_matcher(expected_headers)
             ]
         )
     )
@@ -43,8 +51,17 @@ def test_makes_request(dt_mock):
     dt_mock.now.return_value.isoformat.assert_called_once_with()
 
 
+@patch.dict(os.environ, {"SECRET": uuid.uuid4().hex}, clear=True)
 @responses.activate
 def test_raises_if_no_id():
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="Could not read action run id"):
         submit_application()
+
+@patch.dict(os.environ, {"GITHUB_RUN_ID": uuid.uuid4().hex}, clear=True)
+@responses.activate
+def test_raises_if_no_secret():
+
+    with pytest.raises(RuntimeError, match="Could not read secret"):
+        submit_application()
+
